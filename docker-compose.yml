@@ -7,4 +7,4 @@ services:
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     volumes:
-      - ./price_history.json:/app/price_history.json
+      - /volume2/docker/discord/scup/price_history.json:/app/price_history.json
