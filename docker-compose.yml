@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  discord-bot:
+    build: .
+    container_name: novarp-price-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    volumes:
+      - ./price_history.json:/app/price_history.json
