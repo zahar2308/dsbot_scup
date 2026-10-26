@@ -19,9 +19,14 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 def load_history():
-    if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+    if os.path.exists(HISTORY_FILE) and os.path.getsize(HISTORY_FILE) > 0:
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            print(f"[!] Файл {HISTORY_FILE} поврежден. Создаю новую историю на основе базовых цен.")
+            pass
+
     default_max_prices = {
         "Медь": 72, "Изумруд": 444, "Рубин": 840, "Алмаз": 4800,
         "Бензин": 240, "Солярка": 240, "Керосин": 240, "Окунь": 60,
