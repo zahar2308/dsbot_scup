@@ -176,5 +176,5 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # Запуск бота
-BOT_TOKEN = "MTU2Mzk0Njc3MDE5Nzc3ODU0Mw.GGopPs.ihdS-AJwTPGhld5APSDPx7LbXflLFFyZgCo8Y8".strip()
+BOT_TOKEN = os.getenv("DISCORD_TOKEN").strip()
 bot.run(BOT_TOKEN)
