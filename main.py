@@ -42,6 +42,7 @@ def parse_and_analyze_prices(text_content):
     if not text_content:
         return None
 
+    # Регулярка для поиска ресурсов и цен со скобками и без
     pattern = re.compile(r"(?:-\s*|•\s*)?([^:—]+)\s*[:—]\s*(?:\$)?(\d+)(?:\s*\((?:\$)?(\d+)\))?")
     current_best = {}
     history = load_history()
@@ -51,10 +52,19 @@ def parse_and_analyze_prices(text_content):
         line_clean = line.replace("```md", "").replace("```", "").replace("*", "").replace("_", "").strip()
         if not line_clean:
             continue
-        
+
+        # Очистка от Discord-эмодзи вида :text:
+        line_clean = re.sub(r':[a-zA-Z0-9_]+:', '', line_clean).strip()
+
+        # Добавлены скобки \( и \) в список разрешенных символов, чтобы не ломать 4ч цены
+        line_clean = re.sub(r'[^\w\s\d.,!?:\-_~()─]', '', line_clean).strip()
+        if not line_clean:
+            continue
+
         if "скупщик" in line_clean.lower() or "продуктов" in line_clean.lower():
-            current_buyer = line_clean.replace("🔹", "").replace("🔸", "").strip()
-            current_buyer = current_buyer.replace("Скупщик сырья", "Скупщик").replace("Скупщик продуктов", "Продукты")
+            buyer_name = re.sub(r'^[*\-\s]+', '', line_clean)
+            buyer_name = buyer_name.replace("Скупщик сырья", "Скупщик").replace("Скупщик продуктов", "Продукты")
+            current_buyer = buyer_name.strip()
             continue
 
         match = pattern.search(line_clean)
@@ -64,28 +74,29 @@ def parse_and_analyze_prices(text_content):
                 continue
 
             normal_price = int(match.group(2))
-            is_product = match.group(3) is None
-            four_hours_price = int(match.group(3)) if match.group(3) else normal_price
+            four_hours_price = int(match.group(3)) if match.group(3) else -1
 
             if resource not in current_best:
                 current_best[resource] = {
                     "max_normal": -1, "buyer_normal": "",
-                    "max_4h": -1, "buyer_4h": "", "is_product": is_product
+                    "max_4h": -1, "buyer_4h": ""
                 }
 
             if normal_price > current_best[resource]["max_normal"]:
                 current_best[resource]["max_normal"] = normal_price
                 current_best[resource]["buyer_normal"] = current_buyer
 
-            if four_hours_price > current_best[resource]["max_4h"]:
-                current_best[resource]["max_4h"] = four_hours_price
-                current_best[resource]["buyer_4h"] = current_buyer
+            if four_hours_price != -1:
+                if four_hours_price > current_best[resource]["max_4h"]:
+                    current_best[resource]["max_4h"] = four_hours_price
+                    current_best[resource]["buyer_4h"] = current_buyer
+
+            actual_4h = four_hours_price if four_hours_price != -1 else normal_price
 
             if resource not in history["normal"] or normal_price > history["normal"][resource]:
                 history["normal"][resource] = normal_price
-
-            if resource not in history["four_hours"] or four_hours_price > history["four_hours"][resource]:
-                history["four_hours"][resource] = four_hours_price
+            if resource not in history["four_hours"] or actual_4h > history["four_hours"][resource]:
+                history["four_hours"][resource] = actual_4h
 
     if not current_best:
         return None
