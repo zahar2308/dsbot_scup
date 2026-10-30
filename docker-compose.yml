@@ -5,6 +5,7 @@ services:
     container_name: novarp-price-bot
     restart: unless-stopped
     environment:
+      - TZ=Europe/Moscow
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     volumes:
       - /volume2/docker/discord/scup/price_history.json
