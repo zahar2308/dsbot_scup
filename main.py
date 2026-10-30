@@ -179,14 +179,21 @@ async def on_message(message):
 
                 try:
                     for chunk in chunks:
-                        await target_channel.send(content=chunk)
+                        # --- ИЗМЕНЕНИЕ: Сохраняем сообщение и публикуем его ---
+                        sent_msg = await target_channel.send(content=chunk)
+                        
+                        # Проверяем, является ли канал новостным, чтобы не было ошибок
+                        if isinstance(target_channel, disnake.NewsChannel):
+                            await sent_msg.publish()
+                        # -----------------------------------------------------
+                            
                     print("[+] Отчет БОТА успешно опубликован в канале отчетов!")
                 except disnake.errors.Forbidden:
-                    print("[X] Ошибка: У роли бота нет прав 'Отправлять сообщения' в целевом канале!")
+                    print("[X] Ошибка: У роли бота нет прав 'Отправлять сообщения' или 'Управлять сообщениями' в целевом канале!")
                 except Exception as e:
                     print(f"[X] Ошибка отправки сообщения: {e}")
 
     await bot.process_commands(message)
 
 # Запуск бота с вашим токеном
-bot.run(os.getenv("DISCORD_TOKEN").strip()) 
+bot.run(os.getenv("DISCORD_TOKEN").strip())
