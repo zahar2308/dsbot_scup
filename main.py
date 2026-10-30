@@ -56,7 +56,7 @@ def parse_and_analyze_prices(text_content):
         # Очистка от Discord-эмодзи вида :text:
         line_clean = re.sub(r':[a-zA-Z0-9_]+:', '', line_clean).strip()
 
-        # Добавлены скобки \( и \) в список разрешенных символов, чтобы не ломать 4ч цены
+        # Очистка от лишних символов, но оставляем скобки для цен
         line_clean = re.sub(r'[^\w\s\d.,!?:\-_~()─]', '', line_clean).strip()
         if not line_clean:
             continue
@@ -74,29 +74,32 @@ def parse_and_analyze_prices(text_content):
                 continue
 
             normal_price = int(match.group(2))
-            four_hours_price = int(match.group(3)) if match.group(3) else -1
+            
+            # Если есть скобка (4ч цена) -> это сырье (is_product = False)
+            # Если скобки нет -> это продукт (is_product = True)
+            is_product = match.group(3) is None
+            four_hours_price = int(match.group(3)) if match.group(3) else normal_price
 
             if resource not in current_best:
                 current_best[resource] = {
                     "max_normal": -1, "buyer_normal": "",
-                    "max_4h": -1, "buyer_4h": ""
+                    "max_4h": -1, "buyer_4h": "",
+                    "is_product": is_product # <-- ВОЗВРАЩАЕМ КЛЮЧ
                 }
 
             if normal_price > current_best[resource]["max_normal"]:
                 current_best[resource]["max_normal"] = normal_price
                 current_best[resource]["buyer_normal"] = current_buyer
 
-            if four_hours_price != -1:
-                if four_hours_price > current_best[resource]["max_4h"]:
-                    current_best[resource]["max_4h"] = four_hours_price
-                    current_best[resource]["buyer_4h"] = current_buyer
-
-            actual_4h = four_hours_price if four_hours_price != -1 else normal_price
+            if four_hours_price > current_best[resource]["max_4h"]:
+                current_best[resource]["max_4h"] = four_hours_price
+                current_best[resource]["buyer_4h"] = current_buyer
 
             if resource not in history["normal"] or normal_price > history["normal"][resource]:
                 history["normal"][resource] = normal_price
-            if resource not in history["four_hours"] or actual_4h > history["four_hours"][resource]:
-                history["four_hours"][resource] = actual_4h
+
+            if resource not in history["four_hours"] or four_hours_price > history["four_hours"][resource]:
+                history["four_hours"][resource] = four_hours_price
 
     if not current_best:
         return None
@@ -123,7 +126,7 @@ def parse_and_analyze_prices(text_content):
 
 @bot.event
 async def on_ready():
-    print(f"[+] Бот успешно запущен напрямую без вебхуков!")
+    print(f"[+] Бот успешно запущен!")
     print(f"[+] Читаю канал: {SOURCE_CHANNEL_ID} | Пишу отчеты в канал: {TARGET_CHANNEL_ID}")
 
 @bot.event
@@ -145,14 +148,13 @@ async def on_message(message):
             lines_report = parse_and_analyze_prices(text_to_analyze)
 
             if lines_report:
-                # Находим целевой канал в Дискорде напрямую через бота
                 target_channel = bot.get_channel(TARGET_CHANNEL_ID)
                 
                 if target_channel is None:
                     try:
                         target_channel = await bot.fetch_channel(TARGET_CHANNEL_ID)
                     except Exception:
-                        print(f"[X] Критическая ошибка: Бот не имеет доступа к каналу отчетов {TARGET_CHANNEL_ID} или канал не существует!")
+                        print(f"[X] Критическая ошибка: Бот не имеет доступа к каналу отчетов {TARGET_CHANNEL_ID}!")
                         return
 
                 current_time = datetime.now().strftime('%d.%m.%Y в %H:%M')
@@ -179,17 +181,15 @@ async def on_message(message):
                         sent_msg = await target_channel.send(content=chunk)
                         try:
                             await sent_msg.publish()
-                        except disnake.errors.Forbidden:
-                            print("[X] Ошибка публикации: у бота нет прав, либо канал не является каналом объявлений.")
-                        except disnake.errors.HTTPException as e:
-                            print(f"[X] Ошибка публикации (HTTP): {e}")
-                    print("[+] Отчет БОТА успешно опубликован в канале отчетов!")
+                        except Exception as e:
+                            print(f"[!] Не удалось опубликовать сообщение (возможно, это не канал объявлений): {e}")
+                    print("[+] Отчет БОТА успешно отправлен!")
                 except disnake.errors.Forbidden:
-                    print("[X] Ошибка: У роли бота нет прав 'Отправлять сообщения' в целевом канале отчетов!")
+                    print("[X] Ошибка: У роли бота нет прав 'Отправлять сообщения' в целевом канале!")
                 except Exception as e:
                     print(f"[X] Ошибка отправки сообщения: {e}")
 
     await bot.process_commands(message)
 
 # Запуск бота
-bot.run(os.getenv("DISCORD_TOKEN").strip()) 
+bot.run(os.getenv("DISCORD_TOKEN").strip())
